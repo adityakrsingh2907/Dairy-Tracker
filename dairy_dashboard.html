@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Cow — Dairy Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f0;color:#1a1a1a;padding:16px;}
+  .root{max-width:860px;margin:0 auto;padding-bottom:40px;}
+  .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px;}
+  .pg-title{font-size:20px;font-weight:600;}
+  .db-status{font-size:11px;padding:3px 10px;border-radius:10px;font-weight:600;}
+  .db-ok{background:#EAF3DE;color:#27500A;}
+  .db-err{background:#FCEBEB;color:#791F1F;}
+  .db-loading{background:#f0f0ea;color:#888;}
+  .tab-row{display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap;}
+  .tab{font-size:13px;padding:7px 16px;border-radius:8px;border:1px solid #ddd;background:#fff;color:#555;cursor:pointer;transition:all .15s;}
+  .tab:hover{background:#f0f0ea;}
+  .tab.on{background:#EAF3DE;color:#27500A;border-color:#c0dd97;font-weight:600;}
+  .mgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px;}
+  .mc{background:#fff;border-radius:10px;padding:14px 16px;border:1px solid #e8e8e0;}
+  .ml{font-size:12px;color:#777;margin-bottom:4px;}
+  .mv{font-size:22px;font-weight:600;}
+  .ms{font-size:12px;margin-top:2px;}
+  .good{color:#1D9E75;} .warn{color:#BA7517;} .bad{color:#D85A30;}
+  .card{background:#fff;border:1px solid #e8e8e0;border-radius:12px;padding:16px 20px;margin-bottom:16px;}
+  .ct{font-size:13px;font-weight:600;color:#555;margin-bottom:14px;}
+  .fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:12px;margin-bottom:14px;}
+  .fld{display:flex;flex-direction:column;gap:5px;}
+  .fld label{font-size:12px;color:#666;font-weight:500;}
+  .fld input,.fld select{width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;color:#1a1a1a;background:#fff;}
+  .fld input:focus,.fld select:focus{outline:none;border-color:#1D9E75;box-shadow:0 0 0 3px rgba(29,158,117,0.1);}
+  button{padding:8px 18px;border-radius:8px;border:1px solid #bbb;background:#fff;color:#333;font-size:13px;cursor:pointer;font-weight:500;}
+  button:hover{background:#f0f5ee;border-color:#1D9E75;color:#1D9E75;}
+  button:disabled{opacity:0.5;cursor:not-allowed;}
+  .msel{font-size:13px;padding:6px 10px;border-radius:8px;border:1px solid #ddd;background:#fff;color:#1a1a1a;cursor:pointer;}
+  .sbox{display:grid;gap:1px;background:#e0e0d8;border-radius:10px;overflow:hidden;margin-bottom:16px;}
+  .s3{grid-template-columns:repeat(3,1fr);}
+  .s4{grid-template-columns:repeat(4,1fr);}
+  .sc{background:#f7f7f2;padding:12px 14px;text-align:center;}
+  .sl{font-size:11px;color:#777;margin-bottom:3px;}
+  .sv{font-size:15px;font-weight:600;}
+  .filter-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#f9f9f5;border:1px solid #eee;border-radius:8px;padding:10px 12px;margin-bottom:14px;}
+  .filter-bar .msel{font-size:12px;padding:5px 8px;}
+  .filter-label{font-size:12px;color:#888;font-weight:500;white-space:nowrap;}
+  .clear-btn{font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid #ddd;background:#fff;color:#888;cursor:pointer;}
+  .clear-btn:hover{background:#fff0f0;color:#c00;border-color:#fcc;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{text-align:left;font-size:12px;font-weight:600;color:#666;padding:8px 10px;border-bottom:1px solid #eee;background:#fafaf7;white-space:nowrap;}
+  th.sortable{cursor:pointer;user-select:none;}
+  th.sortable:hover{color:#1D9E75;}
+  .sort-icon{margin-left:4px;font-size:10px;}
+  th.sort-asc .sort-icon::after{content:'▲';}
+  th.sort-desc .sort-icon::after{content:'▼';}
+  th:not(.sort-asc):not(.sort-desc) .sort-icon::after{content:'⇅';opacity:0.4;}
+  td{padding:9px 10px;border-bottom:1px solid #f0f0ea;color:#1a1a1a;vertical-align:middle;}
+  tr:last-child td{border-bottom:none;}
+  tr:hover td{background:#fafaf7;}
+  .pill{font-size:11px;padding:3px 10px;border-radius:12px;display:inline-block;font-weight:500;}
+  .pr{background:#EAF3DE;color:#27500A;}
+  .pp{background:#FAEEDA;color:#633806;}
+  .pn{background:#f0f0ea;color:#555;}
+  .pf{background:#FAEEDA;color:#633806;}
+  .pv{background:#FCEBEB;color:#791F1F;}
+  .pm{background:#E6F1FB;color:#0C447C;}
+  .po{background:#f0f0ea;color:#444;}
+  .chip{display:inline-block;font-size:11px;background:#EAF3DE;color:#27500A;border-radius:10px;padding:2px 9px;font-weight:500;}
+  .dbtn{font-size:12px;padding:3px 10px;border-radius:6px;border:1px solid #ddd;background:#fff;color:#999;cursor:pointer;}
+  .dbtn:hover{background:#fff0f0;color:#c00;border-color:#fcc;}
+  .leg{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px;font-size:12px;color:#666;align-items:center;}
+  .lsq{width:12px;height:12px;border-radius:3px;display:inline-block;flex-shrink:0;}
+  .pbw{height:8px;background:#eee;border-radius:4px;overflow:hidden;margin-top:8px;}
+  .pb{height:100%;border-radius:4px;}
+  .empty{color:#aaa;text-align:center;padding:20px;font-size:13px;font-style:italic;}
+  .export-btn{font-size:12px;padding:5px 12px;border-radius:7px;border:1px solid #c0dd97;background:#EAF3DE;color:#27500A;font-weight:600;cursor:pointer;}
+  .export-btn:hover{background:#d4edbc;border-color:#639922;}
+  .spinner{display:inline-block;width:13px;height:13px;border:2px solid #ccc;border-top-color:#1D9E75;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-right:5px;}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .toast{position:fixed;bottom:24px;right:24px;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:500;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none;}
+  .toast.show{opacity:1;}
+  .toast.ok{background:#EAF3DE;color:#27500A;border:1px solid #c0dd97;}
+  .toast.err{background:#FCEBEB;color:#791F1F;border:1px solid #f7c1c1;}
+  @media(max-width:520px){.s4{grid-template-columns:repeat(2,1fr);}.s3{grid-template-columns:1fr 1fr;}}
+</style>
+</head>
+<body>
+<div class="root">
+
+  <div class="topbar">
+    <p class="pg-title">🐄 My cow — dairy tracker</p>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <span class="db-status db-loading" id="dbStatus">⏳ Connecting...</span>
+      <select class="msel" id="gMonth" onchange="onGM()"></select>
+    </div>
+  </div>
+
+  <div class="tab-row">
+    <button class="tab on" onclick="go('D',this)">Dashboard</button>
+    <button class="tab" onclick="go('S',this)">Sales entries</button>
+    <button class="tab" onclick="go('E',this)">Expense entries</button>
+    <button class="tab" onclick="go('C',this)">Comparison</button>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div id="pgD">
+    <div class="mgrid" id="dM"></div>
+    <div class="card">
+      <p class="ct">Milk production — last 30 days (litres/day)</p>
+      <div style="position:relative;width:100%;height:200px;" id="milkWrap">
+        <canvas id="cM" role="img" aria-label="Daily milk production line chart"></canvas>
+      </div>
+    </div>
+    <div class="card">
+      <p class="ct">Monthly expenses by category (₹)</p>
+      <div class="leg">
+        <span style="display:flex;align-items:center;gap:5px;"><span class="lsq" style="background:#BA7517;"></span>Feed</span>
+        <span style="display:flex;align-items:center;gap:5px;"><span class="lsq" style="background:#D85A30;"></span>Vet / medicine</span>
+        <span style="display:flex;align-items:center;gap:5px;"><span class="lsq" style="background:#185FA5;"></span>Maintenance</span>
+        <span style="display:flex;align-items:center;gap:5px;"><span class="lsq" style="background:#888780;"></span>Other</span>
+      </div>
+      <div style="position:relative;width:100%;height:180px;">
+        <canvas id="cC" role="img" aria-label="Stacked bar chart of monthly expenses"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- SALES -->
+  <div id="pgS" style="display:none;">
+    <div class="card">
+      <p class="ct">Add milk sale entry</p>
+      <div class="fgrid">
+        <div class="fld"><label>Date</label><input type="date" id="sD"></div>
+        <div class="fld">
+          <label>Customer name</label>
+          <input type="text" id="sCust" placeholder="e.g. Ramesh Kumar" list="custList" autocomplete="off">
+          <datalist id="custList"></datalist>
+        </div>
+        <div class="fld">
+          <label>Sold to</label>
+          <input type="text" id="sSoldTo" placeholder="e.g. Dairy Co., shop" list="soldToList" autocomplete="off">
+          <datalist id="soldToList"></datalist>
+        </div>
+        <div class="fld"><label>Milk sold (litres)</label><input type="number" min="0" step="0.5" placeholder="e.g. 12" id="sL"></div>
+        <div class="fld"><label>Rate (₹ / litre)</label><input type="number" min="0" step="0.5" placeholder="e.g. 54" id="sR"></div>
+        <div class="fld">
+          <label>Payment status</label>
+          <select id="sSt">
+            <option value="Received">Received</option>
+            <option value="Pending">Pending</option>
+            <option value="Not Applicable">Not Applicable</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <button id="sBtnAdd" onclick="addSale()">Add entry</button>
+        <span id="sMsg" style="font-size:13px;"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+        <p class="ct" style="margin:0;">Sales — <span id="sML"></span></p>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <button class="export-btn" onclick="exportCSV('sales')">⬇ Export to Excel</button>
+          <select class="msel" id="sMSel" onchange="renderSales()"></select>
+        </div>
+      </div>
+      <div class="filter-bar">
+        <span class="filter-label">Filter by:</span>
+        <select class="msel" id="fCust" onchange="renderSales()"><option value="">All customers</option></select>
+        <select class="msel" id="fSoldTo" onchange="renderSales()"><option value="">All buyers</option></select>
+        <select class="msel" id="fStatus" onchange="renderSales()">
+          <option value="">All statuses</option>
+          <option value="Received">Received</option>
+          <option value="Pending">Pending</option>
+          <option value="Not Applicable">Not Applicable</option>
+        </select>
+        <button class="clear-btn" onclick="clearSF()">Clear filters</button>
+      </div>
+      <div class="sbox s3" id="sSumBox"></div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr>
+            <th>Date</th><th>Customer</th><th>Sold to</th>
+            <th>Milk (L)</th><th>Rate (₹)</th>
+            <th class="sortable" id="thSA" onclick="toggleSort('s','amt')">Amount (₹)<span class="sort-icon"></span></th>
+            <th>Status</th><th></th>
+          </tr></thead>
+          <tbody id="sTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXPENSES -->
+  <div id="pgE" style="display:none;">
+    <div class="card">
+      <p class="ct">Add expense entry</p>
+      <div class="fgrid">
+        <div class="fld"><label>Date</label><input type="date" id="xD"></div>
+        <div class="fld"><label>Category</label>
+          <select id="xCat">
+            <option value="Feed">Feed</option>
+            <option value="Vet">Vet / medicine</option>
+            <option value="Maintenance">Maintenance</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="fld"><label>Amount (₹)</label><input type="number" min="0" placeholder="e.g. 500" id="xA"></div>
+        <div class="fld"><label>Note (optional)</label><input type="text" placeholder="e.g. green fodder" id="xN"></div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <button id="xBtnAdd" onclick="addExp()">Add entry</button>
+        <span id="xMsg" style="font-size:13px;"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+        <p class="ct" style="margin:0;">Expenses — <span id="xML"></span></p>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <button class="export-btn" onclick="exportCSV('expenses')">⬇ Export to Excel</button>
+          <select class="msel" id="xMSel" onchange="renderExp()"></select>
+        </div>
+      </div>
+      <div class="filter-bar">
+        <span class="filter-label">Filter by:</span>
+        <select class="msel" id="fCat" onchange="renderExp()">
+          <option value="">All categories</option>
+          <option value="Feed">Feed</option>
+          <option value="Vet">Vet / medicine</option>
+          <option value="Maintenance">Maintenance</option>
+          <option value="Other">Other</option>
+        </select>
+        <button class="clear-btn" onclick="clearEF()">Clear filters</button>
+      </div>
+      <div class="sbox s4" id="xSumBox"></div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr>
+            <th>Date</th><th>Category</th>
+            <th class="sortable" id="thXA" onclick="toggleSort('x','amt')">Amount (₹)<span class="sort-icon"></span></th>
+            <th>Note</th><th></th>
+          </tr></thead>
+          <tbody id="xTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- COMPARISON -->
+  <div id="pgC" style="display:none;">
+    <div class="card">
+      <p class="ct">Monthly earnings vs total expenses (₹)</p>
+      <div class="leg">
+        <span style="display:flex;align-items:center;gap:5px;"><span class="lsq" style="background:#1D9E75;"></span>Earnings (sales)</span>
+        <span style="display:flex;align-items:center;gap:5px;"><span class="lsq" style="background:#D85A30;"></span>Total expenses</span>
+      </div>
+      <div style="position:relative;width:100%;height:220px;">
+        <canvas id="cCmp" role="img" aria-label="Bar chart comparing monthly earnings and expenses"></canvas>
+      </div>
+    </div>
+    <div id="cmpCards"></div>
+  </div>
+
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ─── Supabase config ─── */
+const SB_URL='https://bnqezfmwpawzkevltlsm.supabase.co';
+const SB_KEY='sb_publishable_uqR19UWpujhIfYGd9G4P7g_hUSiRMuz';
+
+async function sbFetch(path,opts={}){
+  const headers={
+    'apikey':SB_KEY,
+    'Authorization':'Bearer '+SB_KEY,
+    'Content-Type':'application/json',
+    'Prefer':opts.prefer||'return=representation',
+    ...(opts.headers||{})
+  };
+  const res=await fetch(SB_URL+'/rest/v1/'+path,{...opts,headers});
+  if(!res.ok){const e=await res.text();throw new Error(e);}
+  const txt=await res.text();
+  return txt?JSON.parse(txt):null;
+}
+
+/* ─── Helpers ─── */
+const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const today=new Date();
+function ymd(d){return d.toISOString().split('T')[0];}
+function fym(ym){const[y,m]=ym.split('-');return MN[+m-1]+' '+y;}
+function gym(d){return d.slice(0,7);}
+function months6(){
+  const r=[];
+  for(let i=5;i>=0;i--){const d=new Date(today.getFullYear(),today.getMonth()-i,1);r.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);}
+  return r;
+}
+function curYM(){return`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}`;}
+
+function showToast(msg,type='ok'){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.className='toast '+type+' show';
+  clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),3000);
+}
+function setStatus(s){
+  const el=document.getElementById('dbStatus');
+  if(s==='ok'){el.textContent='🟢 Connected';el.className='db-status db-ok';}
+  else if(s==='err'){el.textContent='🔴 Offline';el.className='db-status db-err';}
+  else{el.textContent='⏳ Connecting...';el.className='db-status db-loading';}
+}
+
+/* ─── In-memory store ─── */
+let sales=[];
+let exps=[];
+
+/* ─── Load from Supabase ─── */
+async function loadAll(){
+  setStatus('loading');
+  try{
+    const[sRows,xRows]=await Promise.all([
+      sbFetch('sales?select=*&order=date.desc'),
+      sbFetch('expenses?select=*&order=date.desc')
+    ]);
+    sales=(sRows||[]).map(r=>({
+      id:r.id,date:r.date,cust:r.cust||'',soldTo:r.sold_to||'',
+      ml:parseFloat(r.milk_litres),r:parseFloat(r.rate),st:r.status
+    }));
+    exps=(xRows||[]).map(r=>({
+      id:r.id,date:r.date,cat:r.category,amt:parseFloat(r.amount),note:r.note||''
+    }));
+    setStatus('ok');
+  }catch(e){
+    setStatus('err');
+    showToast('Could not reach database. Showing empty state.','err');
+    console.error(e);
+  }
+  buildSelects();
+  renderDash();renderSales();renderExp();
+}
+
+/* ─── Sort ─── */
+const SS={s:{col:'date',dir:'desc'},x:{col:'date',dir:'desc'}};
+function toggleSort(tbl,col){
+  const s=SS[tbl];
+  s.dir=(s.col===col&&s.dir==='desc')?'asc':'desc';s.col=col;
+  const th=document.getElementById(tbl==='s'?'thSA':'thXA');
+  th.classList.toggle('sort-asc',s.col==='amt'&&s.dir==='asc');
+  th.classList.toggle('sort-desc',s.col==='amt'&&s.dir==='desc');
+  tbl==='s'?renderSales():renderExp();
+}
+function applySort(rows,tbl){
+  const{col,dir}=SS[tbl];
+  return[...rows].sort((a,b)=>{
+    const va=col==='amt'?(tbl==='s'?a.ml*a.r:a.amt):a.date;
+    const vb=col==='amt'?(tbl==='s'?b.ml*b.r:b.amt):b.date;
+    return dir==='asc'?(va>vb?1:-1):(va<vb?1:-1);
+  });
+}
+
+/* ─── Selects / filters ─── */
+function buildSelects(){
+  const ms=months6(),cv=curYM();
+  ['gMonth','sMSel','xMSel'].forEach(id=>{
+    document.getElementById(id).innerHTML=ms.map(m=>`<option value="${m}"${m===cv?' selected':''}>${fym(m)}</option>`).join('');
+  });
+  rebuildSaleFilters();
+}
+function rebuildSaleFilters(){
+  const custs=[...new Set(sales.map(s=>s.cust).filter(Boolean))].sort();
+  const soldTos=[...new Set(sales.map(s=>s.soldTo).filter(Boolean))].sort();
+  document.getElementById('custList').innerHTML=custs.map(c=>`<option value="${c}">`).join('');
+  document.getElementById('soldToList').innerHTML=soldTos.map(s=>`<option value="${s}">`).join('');
+  const fc=document.getElementById('fCust'),vc=fc.value;
+  fc.innerHTML='<option value="">All customers</option>'+custs.map(c=>`<option value="${c}"${c===vc?' selected':''}>${c}</option>`).join('');
+  const fs=document.getElementById('fSoldTo'),vs=fs.value;
+  fs.innerHTML='<option value="">All buyers</option>'+soldTos.map(s=>`<option value="${s}"${s===vs?' selected':''}>${s}</option>`).join('');
+}
+function clearSF(){['fCust','fSoldTo','fStatus'].forEach(id=>document.getElementById(id).value='');renderSales();}
+function clearEF(){document.getElementById('fCat').value='';renderExp();}
+function getSales(ym){return sales.filter(s=>s.date.startsWith(ym));}
+function getExp(ym){return exps.filter(x=>x.date.startsWith(ym));}
+function spill(s){return s==='Received'?'pr':s==='Pending'?'pp':'pn';}
+function cpill(c){return c==='Feed'?'pf':c==='Vet'?'pv':c==='Maintenance'?'pm':'po';}
+
+/* ─── Dashboard ─── */
+let ci1=null,ci2=null,ci3=null;
+
+function renderDash(){
+  const cutoff=new Date(today);cutoff.setDate(cutoff.getDate()-29);
+  const milk30=sales.filter(s=>new Date(s.date)>=cutoff).sort((a,b)=>a.date.localeCompare(b.date));
+  const totL=milk30.reduce((s,r)=>s+r.ml,0);
+  const avgL=milk30.length?(totL/milk30.length).toFixed(1):'—';
+  const cy=curYM();
+  const curExp=getExp(cy).reduce((s,x)=>s+x.amt,0);
+  const curEarn=Math.round(getSales(cy).reduce((s,r)=>s+r.ml*r.r,0));
+  const net=curEarn-curExp;
+  const noVal=!curEarn&&!curExp;
+
+  document.getElementById('dM').innerHTML=`
+    <div class="mc"><p class="ml">Avg daily yield</p><p class="mv">${avgL}${avgL!=='—'?' L':''}</p><p class="ms" style="color:#aaa;">last 30 days</p></div>
+    <div class="mc"><p class="ml">Total 30-day</p><p class="mv">${milk30.length?Math.round(totL)+' L':'—'}</p><p class="ms" style="color:#aaa;">production</p></div>
+    <div class="mc"><p class="ml">This month expenses</p><p class="mv">${curExp?'₹'+curExp.toLocaleString():'—'}</p><p class="ms" style="color:#aaa;">all categories</p></div>
+    <div class="mc"><p class="ml">This month net</p>
+      <p class="mv" style="color:${noVal?'#aaa':net>=0?'#1D9E75':'#D85A30'}">${noVal?'—':(net>=0?'+':'')+'₹'+Math.abs(net).toLocaleString()}</p>
+      <p class="ms ${net>=0?'good':'bad'}">${noVal?'':net>=0?'Profit':'Loss'}</p>
+    </div>`;
+
+  /* milk line chart */
+  if(ci1){ci1.destroy();ci1=null;}
+  const wrap=document.getElementById('milkWrap');
+  if(milk30.length){
+    wrap.innerHTML='<canvas id="cM" role="img" aria-label="Daily milk production line chart" style="position:absolute;top:0;left:0;"></canvas>';
+    ci1=new Chart(document.getElementById('cM'),{type:'line',data:{
+      labels:milk30.map(r=>r.date.slice(5)),
+      datasets:[{label:'Litres',data:milk30.map(r=>r.ml),borderColor:'#1D9E75',backgroundColor:'rgba(29,158,117,0.08)',fill:true,tension:0.35,pointRadius:2,pointBackgroundColor:'#1D9E75'}]
+    },options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{
+      x:{ticks:{font:{size:10},color:'#999',autoSkip:true,maxTicksLimit:10},grid:{display:false}},
+      y:{ticks:{font:{size:10},color:'#999',callback:v=>v+'L'},grid:{color:'rgba(0,0,0,0.05)'}}
+    }}});
+  }else{
+    wrap.innerHTML='<p style="text-align:center;color:#bbb;font-size:13px;padding:50px 0;font-style:italic;">No milk data yet — add sales entries to see your chart.</p>';
+  }
+
+  /* expense stacked bar */
+  const ms=months6();
+  if(ci2){ci2.destroy();ci2=null;}
+  ci2=new Chart(document.getElementById('cC'),{type:'bar',data:{labels:ms.map(fym),datasets:[
+    {label:'Feed',data:ms.map(m=>getExp(m).filter(x=>x.cat==='Feed').reduce((s,x)=>s+x.amt,0)),backgroundColor:'#BA7517',stack:'s'},
+    {label:'Vet',data:ms.map(m=>getExp(m).filter(x=>x.cat==='Vet').reduce((s,x)=>s+x.amt,0)),backgroundColor:'#D85A30',stack:'s'},
+    {label:'Maint',data:ms.map(m=>getExp(m).filter(x=>x.cat==='Maintenance').reduce((s,x)=>s+x.amt,0)),backgroundColor:'#185FA5',stack:'s'},
+    {label:'Other',data:ms.map(m=>getExp(m).filter(x=>x.cat==='Other').reduce((s,x)=>s+x.amt,0)),backgroundColor:'#888780',stack:'s'}
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{
+    x:{ticks:{font:{size:10},color:'#999'},grid:{display:false}},
+    y:{stacked:true,ticks:{font:{size:10},color:'#999',callback:v=>'₹'+(v/1000).toFixed(1)+'k'},grid:{color:'rgba(0,0,0,0.05)'}}
+  }}});
+}
+
+/* ─── Sales render ─── */
+function renderSales(){
+  const ym=document.getElementById('sMSel').value;
+  document.getElementById('sML').textContent=fym(ym);
+  rebuildSaleFilters();
+  const fc=document.getElementById('fCust').value;
+  const fs=document.getElementById('fSoldTo').value;
+  const fst=document.getElementById('fStatus').value;
+  let rows=getSales(ym);
+  if(fc)rows=rows.filter(r=>r.cust===fc);
+  if(fs)rows=rows.filter(r=>r.soldTo===fs);
+  if(fst)rows=rows.filter(r=>r.st===fst);
+  rows=applySort(rows,'s');
+  const all=getSales(ym);
+  const totM=all.reduce((s,r)=>s+r.ml,0);
+  const totA=Math.round(all.reduce((s,r)=>s+r.ml*r.r,0));
+  const recv=Math.round(all.filter(r=>r.st==='Received').reduce((s,r)=>s+r.ml*r.r,0));
+  const pend=Math.round(all.filter(r=>r.st==='Pending').reduce((s,r)=>s+r.ml*r.r,0));
+  document.getElementById('sSumBox').innerHTML=`
+    <div class="sc"><p class="sl">Milk sold</p><p class="sv">${totM.toFixed(1)} L</p></div>
+    <div class="sc"><p class="sl">Total sales</p><p class="sv">₹${totA.toLocaleString()}</p></div>
+    <div class="sc"><p class="sl">Received / Pending</p><p class="sv"><span class="good">₹${recv.toLocaleString()}</span> / <span class="warn">₹${pend.toLocaleString()}</span></p></div>`;
+  document.getElementById('sTbody').innerHTML=rows.length
+    ?rows.map(r=>`<tr>
+      <td>${r.date}</td>
+      <td>${r.cust?`<span class="chip">${r.cust}</span>`:'—'}</td>
+      <td style="color:#555;font-size:12px;">${r.soldTo||'—'}</td>
+      <td>${r.ml.toFixed(1)}</td><td>₹${r.r}</td>
+      <td><strong>₹${Math.round(r.ml*r.r).toLocaleString()}</strong></td>
+      <td><span class="pill ${spill(r.st)}">${r.st}</span></td>
+      <td><button class="dbtn" onclick="delS('${r.id}')">Remove</button></td>
+    </tr>`).join('')
+    :`<tr><td colspan="8" class="empty">No entries match the selected filters.</td></tr>`;
+}
+
+/* ─── Expenses render ─── */
+function renderExp(){
+  const ym=document.getElementById('xMSel').value;
+  document.getElementById('xML').textContent=fym(ym);
+  const fcat=document.getElementById('fCat').value;
+  let rows=getExp(ym);
+  if(fcat)rows=rows.filter(x=>x.cat===fcat);
+  rows=applySort(rows,'x');
+  const all=getExp(ym);
+  const tot=all.reduce((s,x)=>s+x.amt,0);
+  const feed=all.filter(x=>x.cat==='Feed').reduce((s,x)=>s+x.amt,0);
+  const vet=all.filter(x=>x.cat==='Vet').reduce((s,x)=>s+x.amt,0);
+  const maint=all.filter(x=>x.cat==='Maintenance').reduce((s,x)=>s+x.amt,0);
+  const other=all.filter(x=>x.cat==='Other').reduce((s,x)=>s+x.amt,0);
+  document.getElementById('xSumBox').innerHTML=`
+    <div class="sc"><p class="sl">Total spent</p><p class="sv">₹${tot.toLocaleString()}</p></div>
+    <div class="sc"><p class="sl">Feed</p><p class="sv warn">₹${feed.toLocaleString()}</p></div>
+    <div class="sc"><p class="sl">Vet</p><p class="sv bad">₹${vet.toLocaleString()}</p></div>
+    <div class="sc"><p class="sl">Maint + other</p><p class="sv">₹${(maint+other).toLocaleString()}</p></div>`;
+  document.getElementById('xTbody').innerHTML=rows.length
+    ?rows.map(x=>`<tr>
+      <td>${x.date}</td>
+      <td><span class="pill ${cpill(x.cat)}">${x.cat}</span></td>
+      <td><strong>₹${x.amt.toLocaleString()}</strong></td>
+      <td style="color:#777;font-size:12px;">${x.note||'—'}</td>
+      <td><button class="dbtn" onclick="delX('${x.id}')">Remove</button></td>
+    </tr>`).join('')
+    :`<tr><td colspan="5" class="empty">No entries match the selected filters.</td></tr>`;
+}
+
+/* ─── Comparison ─── */
+function renderCompare(){
+  const ms=months6();
+  const earn=ms.map(m=>Math.round(getSales(m).reduce((s,r)=>s+r.ml*r.r,0)));
+  const cost=ms.map(m=>getExp(m).reduce((s,x)=>s+x.amt,0));
+  if(ci3){ci3.destroy();ci3=null;}
+  ci3=new Chart(document.getElementById('cCmp'),{type:'bar',data:{labels:ms.map(fym),datasets:[
+    {label:'Earnings',data:earn,backgroundColor:'#1D9E75'},
+    {label:'Expenses',data:cost,backgroundColor:'#D85A30'}
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{
+    x:{ticks:{font:{size:10},color:'#999'},grid:{display:false}},
+    y:{ticks:{font:{size:10},color:'#999',callback:v=>'₹'+(v/1000).toFixed(1)+'k'},grid:{color:'rgba(0,0,0,0.05)'}}
+  }}});
+  document.getElementById('cmpCards').innerHTML=ms.map((m,i)=>{
+    const p=earn[i]-cost[i],pct=cost[i]?Math.min(150,Math.round((earn[i]/cost[i])*100)):100,col=p>=0?'#1D9E75':'#D85A30';
+    return`<div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
+        <span style="font-size:15px;font-weight:600;">${fym(m)}</span>
+        <span style="font-size:13px;font-weight:600;color:${col};">${p>=0?'+ ':'– '}₹${Math.abs(p).toLocaleString()} ${p>=0?'profit':'loss'}</span>
+      </div>
+      <div style="display:flex;gap:20px;margin-top:8px;font-size:12px;color:#666;flex-wrap:wrap;">
+        <span>Earnings: <strong>₹${earn[i].toLocaleString()}</strong></span>
+        <span>Expenses: <strong>₹${cost[i].toLocaleString()}</strong></span>
+        <span>Coverage: <strong style="color:${col};">${pct}%</strong></span>
+      </div>
+      <div class="pbw"><div class="pb" style="width:${Math.min(100,pct)}%;background:${col};"></div></div>
+    </div>`;
+  }).join('');
+}
+
+/* ─── Add sale ─── */
+async function addSale(){
+  const date=document.getElementById('sD').value;
+  const cust=document.getElementById('sCust').value.trim();
+  const soldTo=document.getElementById('sSoldTo').value.trim();
+  const ml=parseFloat(document.getElementById('sL').value);
+  const r=parseFloat(document.getElementById('sR').value);
+  const st=document.getElementById('sSt').value;
+  const msg=document.getElementById('sMsg');
+  const btn=document.getElementById('sBtnAdd');
+  if(!date||isNaN(ml)||isNaN(r)||ml<=0||r<=0){
+    msg.style.color='#c00';msg.textContent='Please fill date, litres and rate correctly.';return;
+  }
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span>Saving...';msg.textContent='';
+  const id='s'+Date.now();
+  try{
+    await sbFetch('sales',{method:'POST',prefer:'return=minimal',
+      body:JSON.stringify({id,date,cust,sold_to:soldTo,milk_litres:ml,rate:r,status:st})
+    });
+    sales.unshift({id,date,cust,soldTo,ml,r,st});
+    ['sL','sR','sCust','sSoldTo'].forEach(i=>document.getElementById(i).value='');
+    msg.style.color='#1D9E75';
+    msg.textContent=`Saved — ₹${Math.round(ml*r).toLocaleString()}${cust?' for '+cust:''} (${st})`;
+    document.getElementById('sMSel').value=gym(date);
+    rebuildSaleFilters();renderSales();renderDash();
+    showToast('Sale entry saved ✓');
+  }catch(e){
+    msg.style.color='#c00';msg.textContent='Save failed — check your connection.';
+    showToast('Failed to save entry.','err');console.error(e);
+  }
+  btn.disabled=false;btn.textContent='Add entry';
+}
+
+/* ─── Add expense ─── */
+async function addExp(){
+  const date=document.getElementById('xD').value;
+  const cat=document.getElementById('xCat').value;
+  const amt=parseFloat(document.getElementById('xA').value);
+  const note=document.getElementById('xN').value.trim();
+  const msg=document.getElementById('xMsg');
+  const btn=document.getElementById('xBtnAdd');
+  if(!date||isNaN(amt)||amt<=0){
+    msg.style.color='#c00';msg.textContent='Please fill date and a valid amount.';return;
+  }
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span>Saving...';msg.textContent='';
+  const id='x'+Date.now();
+  try{
+    await sbFetch('expenses',{method:'POST',prefer:'return=minimal',
+      body:JSON.stringify({id,date,category:cat,amount:amt,note})
+    });
+    exps.unshift({id,date,cat,amt,note});
+    ['xA','xN'].forEach(i=>document.getElementById(i).value='');
+    msg.style.color='#1D9E75';msg.textContent=`Saved — ₹${amt.toLocaleString()} under ${cat}`;
+    document.getElementById('xMSel').value=gym(date);
+    renderExp();renderDash();
+    showToast('Expense entry saved ✓');
+  }catch(e){
+    msg.style.color='#c00';msg.textContent='Save failed — check your connection.';
+    showToast('Failed to save entry.','err');console.error(e);
+  }
+  btn.disabled=false;btn.textContent='Add entry';
+}
+
+/* ─── Delete ─── */
+async function delS(id){
+  if(!confirm('Remove this sale entry?'))return;
+  try{
+    await sbFetch(`sales?id=eq.${id}`,{method:'DELETE',prefer:'return=minimal'});
+    sales=sales.filter(s=>s.id!==id);
+    renderSales();renderDash();showToast('Entry removed');
+  }catch(e){showToast('Delete failed.','err');console.error(e);}
+}
+async function delX(id){
+  if(!confirm('Remove this expense entry?'))return;
+  try{
+    await sbFetch(`expenses?id=eq.${id}`,{method:'DELETE',prefer:'return=minimal'});
+    exps=exps.filter(x=>x.id!==id);
+    renderExp();renderDash();showToast('Entry removed');
+  }catch(e){showToast('Delete failed.','err');console.error(e);}
+}
+
+/* ─── CSV export ─── */
+function exportCSV(type){
+  const ym=type==='sales'?document.getElementById('sMSel').value:document.getElementById('xMSel').value;
+  const ml=fym(ym).replace(' ','_');
+  let headers,rows,filename;
+  if(type==='sales'){
+    headers=['Date','Customer','Sold To','Milk (L)','Rate (Rs/L)','Amount (Rs)','Payment Status'];
+    const data=getSales(ym);
+    rows=data.map(r=>[r.date,r.cust||'',r.soldTo||'',r.ml.toFixed(1),r.r,Math.round(r.ml*r.r),r.st]);
+    const tM=data.reduce((s,r)=>s+r.ml,0),tA=Math.round(data.reduce((s,r)=>s+r.ml*r.r,0));
+    const rc=Math.round(data.filter(r=>r.st==='Received').reduce((s,r)=>s+r.ml*r.r,0));
+    const pd=Math.round(data.filter(r=>r.st==='Pending').reduce((s,r)=>s+r.ml*r.r,0));
+    rows.push([],['SUMMARY','','','','','',''],['Total milk (L)','','',''+tM.toFixed(1),'','',''],['Total sales (Rs)','','','','',''+tA,''],['Received (Rs)','','','','',''+rc,''],['Pending (Rs)','','','','',''+pd,'']);
+    filename=`sales_${ml}.csv`;
+  }else{
+    headers=['Date','Category','Amount (Rs)','Note'];
+    const data=getExp(ym);
+    rows=data.map(x=>[x.date,x.cat,x.amt,x.note||'']);
+    const tot=data.reduce((s,x)=>s+x.amt,0);
+    const fd=data.filter(x=>x.cat==='Feed').reduce((s,x)=>s+x.amt,0);
+    const vt=data.filter(x=>x.cat==='Vet').reduce((s,x)=>s+x.amt,0);
+    const mt=data.filter(x=>x.cat==='Maintenance').reduce((s,x)=>s+x.amt,0);
+    const ot=data.filter(x=>x.cat==='Other').reduce((s,x)=>s+x.amt,0);
+    rows.push([],['SUMMARY','','',''],['Total (Rs)','',''+tot,''],['Feed (Rs)','',''+fd,''],['Vet (Rs)','',''+vt,''],['Maintenance (Rs)','',''+mt,''],['Other (Rs)','',''+ot,'']);
+    filename=`expenses_${ml}.csv`;
+  }
+  const esc=v=>'"'+String(v).replace(/"/g,'""')+'"';
+  const csv='\uFEFF'+[headers.map(esc).join(','),...rows.map(r=>r.map(esc).join(','))].join('\r\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
+  a.download=filename;document.body.appendChild(a);a.click();document.body.removeChild(a);
+}
+
+/* ─── Navigation ─── */
+function onGM(){
+  const v=document.getElementById('gMonth').value;
+  document.getElementById('sMSel').value=v;document.getElementById('xMSel').value=v;
+  renderSales();renderExp();
+  if(document.getElementById('pgC').style.display!=='none')renderCompare();
+}
+function go(pg,btn){
+  ['D','S','E','C'].forEach(p=>document.getElementById('pg'+p).style.display='none');
+  document.getElementById('pg'+pg).style.display='block';
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  btn.classList.add('on');
+  if(pg==='C')renderCompare();
+}
+
+/* ─── Init ─── */
+document.getElementById('sD').value=ymd(today);
+document.getElementById('xD').value=ymd(today);
+loadAll();
+</script>
+</body>
+</html>
